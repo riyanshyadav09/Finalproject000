@@ -1,0 +1,87 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: streamflix-app
+  namespace: streamflix
+  labels:
+    app: streamflix
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: streamflix
+  template:
+    metadata:
+      labels:
+        app: streamflix
+    spec:
+      containers:
+      - name: streamflix
+        image: riyanshyadav09/streamflix:latest
+        ports:
+        - containerPort: 3000
+        env:
+        - name: NODE_ENV
+          valueFrom:
+            configMapKeyRef:
+              name: streamflix-config
+              key: NODE_ENV
+        - name: NEXTAUTH_URL
+          valueFrom:
+            configMapKeyRef:
+              name: streamflix-config
+              key: NEXTAUTH_URL
+        - name: DATABASE_URL
+          valueFrom:
+            secretKeyRef:
+              name: streamflix-secrets
+              key: DATABASE_URL
+        - name: NEXTAUTH_SECRET
+          valueFrom:
+            secretKeyRef:
+              name: streamflix-secrets
+              key: NEXTAUTH_SECRET
+        - name: JWT_SECRET
+          valueFrom:
+            secretKeyRef:
+              name: streamflix-secrets
+              key: JWT_SECRET
+        - name: AWS_ACCESS_KEY_ID
+          valueFrom:
+            secretKeyRef:
+              name: streamflix-secrets
+              key: AWS_ACCESS_KEY_ID
+        - name: AWS_SECRET_ACCESS_KEY
+          valueFrom:
+            secretKeyRef:
+              name: streamflix-secrets
+              key: AWS_SECRET_ACCESS_KEY
+        - name: AWS_REGION
+          valueFrom:
+            configMapKeyRef:
+              name: streamflix-config
+              key: AWS_REGION
+        - name: S3_BUCKET_NAME
+          valueFrom:
+            secretKeyRef:
+              name: streamflix-secrets
+              key: S3_BUCKET_NAME
+        resources:
+          requests:
+            memory: "256Mi"
+            cpu: "250m"
+          limits:
+            memory: "512Mi"
+            cpu: "500m"
+        livenessProbe:
+          httpGet:
+            path: /api/health
+            port: 3000
+          initialDelaySeconds: 30
+          periodSeconds: 10
+        readinessProbe:
+          httpGet:
+            path: /api/health
+            port: 3000
+          initialDelaySeconds: 5
+          periodSeconds: 5

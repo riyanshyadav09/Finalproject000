@@ -1,0 +1,15 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: streamflix-config
+  namespace: streamflix
+data:
+  NODE_ENV: "production"
+  NEXTAUTH_URL: "https://streamflix.example.com"
+  AWS_REGION: "us-east-1"
+  CLOUDFRONT_DOMAIN: "your-cloudfront-domain.cloudfront.net"
+  SMTP_HOST: "smtp.gmail.com"
+  SMTP_PORT: "587"
+  RATE_LIMIT_WINDOW_MS: "900000"
+  RATE_LIMIT_MAX_REQUESTS: "100"
+  MAX_FILE_SIZE: "5368709120"
