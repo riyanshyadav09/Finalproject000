@@ -6,7 +6,7 @@ const nextConfig = {
     serverActions: true,
   },
   images: {
-    domains: ['your-s3-bucket.s3.amazonaws.com', 'your-cloudfront-domain.cloudfront.net'],
+    domains: ['your-s3-bucket.s3.amazonaws.com', 'your-cloudfront-domain.cloudfront.net', 'via.placeholder.com', 'images.unsplash.com'],
   },
   env: {
     CUSTOM_KEY: process.env.CUSTOM_KEY,
