@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server'
 import bcrypt from 'bcryptjs'
 import jwt from 'jsonwebtoken'
 import { prisma } from '@/lib/db'
+import { AuthMiddleware } from '@/lib/security/auth-middleware'
+import { SecureCookieManager } from '@/lib/security/secure-cookies'
 
 export async function POST(request: NextRequest) {
   try {
@@ -57,11 +59,16 @@ export async function POST(request: NextRequest) {
       } : null
     }
 
-    return NextResponse.json({
+    const response = NextResponse.json({
       success: true,
       token,
       user: userData
     })
+
+    // Set secure authentication cookie
+    SecureCookieManager.setAuthToken(response, user.id, user.role)
+    
+    return response
 
   } catch (error) {
     console.error('Login error:', error)

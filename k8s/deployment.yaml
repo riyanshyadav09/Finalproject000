@@ -66,6 +66,30 @@ spec:
             secretKeyRef:
               name: streamflix-secrets
               key: S3_BUCKET_NAME
+        - name: SESSION_ENCRYPTION_KEY
+          valueFrom:
+            secretKeyRef:
+              name: streamflix-encryption-keys
+              key: session-key
+        - name: COOKIE_ENCRYPTION_KEY
+          valueFrom:
+            secretKeyRef:
+              name: streamflix-encryption-keys
+              key: cookie-key
+        - name: STREAM_ENCRYPTION_KEY
+          valueFrom:
+            secretKeyRef:
+              name: streamflix-encryption-keys
+              key: stream-key
+        - name: VIDEO_SIGNING_KEY
+          valueFrom:
+            secretKeyRef:
+              name: streamflix-encryption-keys
+              key: video-signing-key
+        volumeMounts:
+        - name: ssl-certs
+          mountPath: /ssl
+          readOnly: true
         resources:
           requests:
             memory: "256Mi"
@@ -85,3 +109,7 @@ spec:
             port: 3000
           initialDelaySeconds: 5
           periodSeconds: 5
+      volumes:
+      - name: ssl-certs
+        secret:
+          secretName: streamflix-ssl-secret

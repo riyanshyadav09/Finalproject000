@@ -1,0 +1,299 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: database-config
+  namespace: streamflix
+data:
+  bigtable-config.yaml: |
+    projectId: streamflix-prod
+    instanceId: streamflix-bigtable
+    tables:
+      - user_watch_history
+      - video_metrics
+      - user_recommendations
+      - search_index
+  spanner-config.yaml: |
+    projectId: streamflix-prod
+    instanceId: streamflix-spanner
+    databaseId: streamflix-db
+    nodes: 3
+  colossus-config.yaml: |
+    replicationFactor: 3
+    chunkSize: 67108864
+    compressionEnabled: true
+
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: bigtable-cluster
+  namespace: streamflix
+spec:
+  serviceName: bigtable-service
+  replicas: 3
+  selector:
+    matchLabels:
+      app: bigtable
+  template:
+    metadata:
+      labels:
+        app: bigtable
+    spec:
+      containers:
+      - name: bigtable-node
+        image: streamflix/bigtable:latest
+        ports:
+        - containerPort: 8086
+        env:
+        - name: NODE_ID
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.name
+        - name: CLUSTER_SIZE
+          value: "3"
+        resources:
+          requests:
+            memory: "4Gi"
+            cpu: "1000m"
+          limits:
+            memory: "8Gi"
+            cpu: "2000m"
+        volumeMounts:
+        - name: bigtable-storage
+          mountPath: /data
+  volumeClaimTemplates:
+  - metadata:
+      name: bigtable-storage
+    spec:
+      accessModes: ["ReadWriteOnce"]
+      resources:
+        requests:
+          storage: 100Gi
+      storageClassName: fast-ssd
+
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: spanner-cluster
+  namespace: streamflix
+spec:
+  serviceName: spanner-service
+  replicas: 5
+  selector:
+    matchLabels:
+      app: spanner
+  template:
+    metadata:
+      labels:
+        app: spanner
+    spec:
+      containers:
+      - name: spanner-node
+        image: streamflix/spanner:latest
+        ports:
+        - containerPort: 9010
+        - containerPort: 9020
+        env:
+        - name: NODE_ID
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.name
+        - name: CLUSTER_SIZE
+          value: "5"
+        - name: REGION
+          value: "us-central1"
+        resources:
+          requests:
+            memory: "8Gi"
+            cpu: "2000m"
+          limits:
+            memory: "16Gi"
+            cpu: "4000m"
+        volumeMounts:
+        - name: spanner-storage
+          mountPath: /data
+  volumeClaimTemplates:
+  - metadata:
+      name: spanner-storage
+    spec:
+      accessModes: ["ReadWriteOnce"]
+      resources:
+        requests:
+          storage: 200Gi
+      storageClassName: fast-ssd
+
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: colossus-cluster
+  namespace: streamflix
+spec:
+  serviceName: colossus-service
+  replicas: 6
+  selector:
+    matchLabels:
+      app: colossus
+  template:
+    metadata:
+      labels:
+        app: colossus
+    spec:
+      containers:
+      - name: colossus-chunkserver
+        image: streamflix/colossus:latest
+        ports:
+        - containerPort: 8080
+        env:
+        - name: CHUNK_SERVER_ID
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.name
+        - name: MASTER_ENDPOINT
+          value: "colossus-master:8081"
+        - name: REPLICATION_FACTOR
+          value: "3"
+        resources:
+          requests:
+            memory: "2Gi"
+            cpu: "500m"
+          limits:
+            memory: "4Gi"
+            cpu: "1000m"
+        volumeMounts:
+        - name: colossus-storage
+          mountPath: /chunks
+  volumeClaimTemplates:
+  - metadata:
+      name: colossus-storage
+    spec:
+      accessModes: ["ReadWriteOnce"]
+      resources:
+        requests:
+          storage: 1Ti
+      storageClassName: standard-ssd
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: colossus-master
+  namespace: streamflix
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: colossus-master
+  template:
+    metadata:
+      labels:
+        app: colossus-master
+    spec:
+      containers:
+      - name: colossus-master
+        image: streamflix/colossus-master:latest
+        ports:
+        - containerPort: 8081
+        env:
+        - name: MASTER_ID
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.name
+        - name: ETCD_ENDPOINTS
+          value: "etcd-cluster:2379"
+        resources:
+          requests:
+            memory: "1Gi"
+            cpu: "500m"
+          limits:
+            memory: "2Gi"
+            cpu: "1000m"
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: bigtable-service
+  namespace: streamflix
+spec:
+  clusterIP: None
+  selector:
+    app: bigtable
+  ports:
+  - port: 8086
+    targetPort: 8086
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: spanner-service
+  namespace: streamflix
+spec:
+  clusterIP: None
+  selector:
+    app: spanner
+  ports:
+  - name: grpc
+    port: 9010
+    targetPort: 9010
+  - name: http
+    port: 9020
+    targetPort: 9020
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: colossus-service
+  namespace: streamflix
+spec:
+  clusterIP: None
+  selector:
+    app: colossus
+  ports:
+  - port: 8080
+    targetPort: 8080
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: colossus-master
+  namespace: streamflix
+spec:
+  selector:
+    app: colossus-master
+  ports:
+  - port: 8081
+    targetPort: 8081
+
+---
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: database-maintenance
+  namespace: streamflix
+spec:
+  schedule: "0 2 * * *"
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          containers:
+          - name: maintenance
+            image: streamflix/db-maintenance:latest
+            command:
+            - /bin/sh
+            - -c
+            - |
+              echo "Starting database maintenance..."
+              # Bigtable compaction
+              curl -X POST http://bigtable-service:8086/admin/compact
+              # Spanner statistics update
+              curl -X POST http://spanner-service:9020/admin/update-stats
+              # Colossus garbage collection
+              curl -X POST http://colossus-master:8081/admin/gc
+              echo "Maintenance completed"
+          restartPolicy: OnFailure

@@ -51,6 +51,7 @@ model User {
   verificationToken String?
   resetToken    String?
   resetTokenExpiry DateTime?
+  googleId      String?   @unique
   
   // Subscription
   subscription  Subscription?

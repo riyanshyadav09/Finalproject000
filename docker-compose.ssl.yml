@@ -1,0 +1,67 @@
+version: '3.8'
+
+services:
+  streamflix:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "3000:3000"
+    environment:
+      - NODE_ENV=production
+      - DATABASE_URL=postgresql://postgres:password@postgres:5432/streamflix
+      - NEXTAUTH_SECRET=your-nextauth-secret
+      - JWT_SECRET=your-jwt-secret
+      - SESSION_ENCRYPTION_KEY=your-session-encryption-key-32-bytes
+      - COOKIE_ENCRYPTION_KEY=your-cookie-encryption-key-32-bytes
+      - STREAM_ENCRYPTION_KEY=your-stream-encryption-key-32-bytes
+      - VIDEO_SIGNING_KEY=your-video-signing-key
+      - SSL_CERT_PATH=/ssl/cert.pem
+      - SSL_KEY_PATH=/ssl/private.key
+      - DOMAIN=streamflix.com
+    volumes:
+      - ./ssl:/ssl:ro
+    depends_on:
+      - postgres
+      - redis
+    networks:
+      - streamflix-network
+
+  nginx:
+    image: nginx:alpine
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx-ssl.conf:/etc/nginx/nginx.conf:ro
+      - ./ssl:/ssl:ro
+    depends_on:
+      - streamflix
+    networks:
+      - streamflix-network
+
+  postgres:
+    image: postgres:15-alpine
+    environment:
+      - POSTGRES_DB=streamflix
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=password
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - streamflix-network
+
+  redis:
+    image: redis:7-alpine
+    volumes:
+      - redis_data:/data
+    networks:
+      - streamflix-network
+
+volumes:
+  postgres_data:
+  redis_data:
+
+networks:
+  streamflix-network:
+    driver: bridge

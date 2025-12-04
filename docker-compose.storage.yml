@@ -1,0 +1,39 @@
+version: '3.8'
+
+services:
+  streamflix-storage:
+    build: 
+      context: .
+      dockerfile: Dockerfile.ffmpeg
+    container_name: streamflix-storage
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./videos:/app/videos
+      - ./temp:/app/temp
+    environment:
+      - NODE_ENV=production
+      - STORAGE_TYPE=local
+    networks:
+      - streamflix-network
+
+  nginx-storage:
+    image: nginx:alpine
+    container_name: nginx-storage
+    ports:
+      - "80:80"
+    volumes:
+      - ./videos:/usr/share/nginx/html/videos:ro
+      - ./nginx-storage.conf:/etc/nginx/nginx.conf:ro
+    depends_on:
+      - streamflix-storage
+    networks:
+      - streamflix-network
+
+networks:
+  streamflix-network:
+    driver: bridge
+
+volumes:
+  video_storage:
+    driver: local
