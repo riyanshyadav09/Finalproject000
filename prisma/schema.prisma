@@ -10,34 +10,6 @@ datasource db {
   url       = env("DATABASE_URL")
 }
 
-enum UserRole {
-  USER
-  PREMIUM
-  CREATOR
-  ADMIN
-}
-
-enum SubscriptionTier {
-  FREE
-  BASIC
-  PREMIUM
-  ULTRA
-}
-
-enum VideoQuality {
-  SD_360
-  HD_720
-  FHD_1080
-  UHD_4K
-}
-
-enum VideoStatus {
-  UPLOADING
-  PROCESSING
-  READY
-  FAILED
-}
-
 model User {
   id            String   @id @default(cuid())
   email         String   @unique
@@ -46,12 +18,11 @@ model User {
   firstName     String?
   lastName      String?
   avatar        String?
-  role          UserRole @default(USER)
+  role          String   @default("USER")
   isVerified    Boolean  @default(false)
   verificationToken String?
   resetToken    String?
   resetTokenExpiry DateTime?
-  googleId      String?   @unique
   
   // Subscription
   subscription  Subscription?
@@ -63,6 +34,8 @@ model User {
   comments      Comment[]
   ratings       Rating[]
   playlists     Playlist[]
+  accounts      Account[]
+  sessions      Session[]
   
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
@@ -73,7 +46,7 @@ model User {
 model Subscription {
   id            String           @id @default(cuid())
   userId        String           @unique
-  tier          SubscriptionTier @default(FREE)
+  tier          String           @default("FREE")
   stripeCustomerId String?
   stripeSubscriptionId String?
   currentPeriodStart DateTime?
@@ -97,7 +70,7 @@ model Video {
   views         Int           @default(0)
   likes         Int           @default(0)
   dislikes      Int           @default(0)
-  status        VideoStatus   @default(UPLOADING)
+  status        String        @default("UPLOADING")
   isPublic      Boolean       @default(true)
   isPremium     Boolean       @default(false)
   
@@ -105,11 +78,11 @@ model Video {
   originalUrl   String?
   hlsUrl        String?       // HLS master playlist
   
-  // Quality variants
-  qualities     VideoQuality[]
+  // Quality variants (stored as comma-separated string)
+  qualities     String?
   
-  // Metadata
-  tags          String[]
+  // Metadata (stored as comma-separated string)
+  tags          String?
   category      String?
   language      String?
   
@@ -227,9 +200,49 @@ model Analytics {
   videoId       String?
   userId        String?
   event         String   // 'view', 'like', 'share', 'download'
-  metadata      Json?
+  metadata      String?
   
   createdAt     DateTime @default(now())
   
   @@map("analytics")
+}
+
+// NextAuth.js Tables
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String?
+  access_token      String?
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String?
+  session_state     String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+  @@map("accounts")
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("sessions")
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+  @@map("verificationtokens")
 }
